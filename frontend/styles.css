@@ -1,0 +1,437 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: #f8f9fa;
+    min-height: 100vh;
+    color: #333;
+}
+
+body, input, button, textarea, select {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+/* Monospace font for ETA numbers to prevent text jumping */
+.eta-number {
+    font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 3rem;
+    color: #333;
+}
+
+header h1 {
+    font-size: 3rem;
+    font-weight: 300;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.5px;
+}
+
+header h1 a {
+    color: #333;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+header h1 a:hover {
+    color: #666;
+    cursor: pointer;
+}
+
+header p {
+    font-size: 1.2rem;
+    opacity: 0.9;
+    font-weight: 300;
+}
+
+.card {
+    background: white;
+    border-radius: 12px;
+    padding: 2rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+}
+
+.card h2 {
+    margin-bottom: 1.5rem;
+    color: #2d3748;
+    font-weight: 600;
+}
+
+.drop-zone {
+    border: 2px dashed #cbd5e0;
+    border-radius: 8px;
+    padding: 3rem 2rem;
+    text-align: center;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    position: relative;
+}
+
+.drop-zone:hover {
+    border-color: #333;
+    background-color: #f7fafc;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.drop-zone.dragover {
+    border-color: #333;
+    background-color: #f0f0f0;
+    transform: scale(1.02);
+}
+
+.drop-zone::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 8px;
+    background: linear-gradient(45deg, transparent, rgba(51, 51, 51, 0.05), transparent);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.drop-zone:hover::before {
+    opacity: 1;
+}
+
+.drop-zone-content {
+    color: #718096;
+}
+
+.upload-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+    font-weight: 300;
+}
+
+.drop-zone:hover .upload-icon {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.drop-zone-content p {
+    margin-bottom: 0.5rem;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.btn-primary {
+    background-color: #333;
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #555;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background-color: #e2e8f0;
+    color: #4a5568;
+}
+
+.btn-secondary:hover {
+    background-color: #cbd5e0;
+}
+
+.file-info {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #e2e8f0;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+}
+
+.file-info h3 {
+    margin-bottom: 1rem;
+    color: #2d3748;
+}
+
+.file-details {
+    background-color: #f7fafc;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1.5rem;
+}
+
+.file-details p {
+    margin-bottom: 0.5rem;
+}
+
+/* Make filenames wrap properly */
+.file-details span {
+    word-wrap: break-word;
+    word-break: break-all;
+    overflow-wrap: break-word;
+    hyphens: auto;
+    max-width: 100%;
+    display: inline-block;
+}
+
+/* Ensure file name specifically wraps well */
+#file-name {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+    display: inline-block;
+    line-height: 1.4;
+}
+
+/* For >1 file */
+#file-list {
+    margin-bottom: 1rem;
+}
+
+.file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+    background-color: white;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+    min-height: 60px;
+}
+
+.file-item .file-info {
+    flex: 1;
+    margin: 0;
+    padding: 0;
+    border: none;
+    min-width: 0; /* Allows flex item to shrink below content size */
+    overflow: hidden; /* Prevents overflow */
+}
+
+.file-item .file-name {
+    font-weight: 500;
+    color: #2d3748;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    hyphens: auto;
+    max-width: 100%;
+    line-height: 1.3;
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+.file-item .file-size {
+    font-size: 0.9rem;
+    color: #718096;
+    margin-top: 0;
+    display: block;
+    line-height: 1.2;
+}
+
+.file-remove {
+    color: #666;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    margin-left: 0.5rem;
+    transition: color 0.2s ease;
+    user-select: none;
+    line-height: 1;
+    flex-shrink: 0; /* Prevents the X from shrinking */
+    padding-top: 0.1rem; /* Aligns with the top of the filename */
+}
+
+.file-remove:hover {
+    color: #333;
+}
+
+.total-info {
+    padding-top: 1rem;
+    border-top: 1px solid #e2e8f0;
+}
+
+.file-progress, .overall-progress {
+    margin-bottom: 1.5rem;
+}
+
+.file-progress p, .overall-progress p {
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+}
+
+#overall-progress-fill {
+    background-color: #4a5568;
+}
+
+#receiver-overall-progress-fill {
+    background-color: #4a5568;
+}
+
+.share-link {
+    margin-bottom: 1.5rem;
+}
+
+.link-container {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.link-container input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    background-color: #f7fafc;
+}
+
+.status {
+    background-color: #f8f9fa;
+    color: #333;
+    padding: 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0;
+}
+
+.progress-container {
+    margin-top: 1rem;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background-color: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: #333;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+.progress-container p {
+    text-align: center;
+    font-weight: 500;
+    color: #4a5568;
+}
+
+/* FAQ Styles */
+.faq-container {
+    margin-top: 1rem;
+}
+
+.faq-item {
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 0.5rem;
+}
+
+.faq-item:last-child {
+    border-bottom: none;
+}
+
+.faq-item summary {
+    cursor: pointer;
+    padding: 1rem 0;
+    font-weight: 600;
+    color: #2d3748;
+    transition: color 0.2s ease;
+}
+
+.faq-item summary:hover {
+    color: #333;
+}
+
+.faq-item p {
+    padding: 0 0 1rem 0;
+    color: #4a5568;
+    line-height: 1.6;
+}
+
+.faq-item a {
+    color: #333;
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
+}
+
+.faq-item a:hover {
+    text-decoration-thickness: 2px;
+}
+
+.faq-item code {
+    background-color: #f1f5f9;
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.9em;
+    color: #334155;
+}
+
+.footer {
+    text-align: center;
+    padding: 2rem 0;
+    margin-top: 2rem;
+    border-top: 1px solid #e2e8f0;
+    color: #718096;
+    font-size: 0.9rem;
+}
+
+.footer p {
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    header h1 {
+        font-size: 2.5rem;
+    }
+    
+    .card {
+        padding: 1.5rem;
+    }
+    
+    .drop-zone {
+        padding: 2rem 1rem;
+    }
+    
+    .link-container {
+        flex-direction: column;
+    }
+}

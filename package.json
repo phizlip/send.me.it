@@ -1,0 +1,22 @@
+{
+  "name": "efficient-transferer",
+  "version": "1.0.0",
+  "description": "Minimal PeerJS-based P2P file sharing",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "peer": "^1.0.2"
+  },
+  "devDependencies": {},
+  "keywords": [
+    "p2p",
+    "file-sharing",
+    "peerjs"
+  ],
+  "author": "",
+  "license": "MIT"
+}

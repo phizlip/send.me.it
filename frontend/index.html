@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>send.me.it - P2P File Transfer</title>
+    
+    <!-- Discord/Open Graph Meta Tags -->
+    <meta property="og:title" content="send.me.it">
+    <meta property="og:description" content="Secure P2P file transfer">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://send.me.it">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><a href="#" onclick="resetToHome(); return false;">send.me.it</a></h1>
+            <p>Secure peer-to-peer file transfer</p>
+        </header>
+
+        <main>
+            <!-- File Sender Section -->
+            <section id="sender-section" class="card">
+                <h2>Send file(s)</h2>
+                <div class="drop-zone" id="drop-zone">
+                    <div class="drop-zone-content">
+                        <div class="upload-icon">+</div>
+                        <p>Drag and drop files here</p>
+                        <p>or click anywhere in this area</p>
+                        <input type="file" id="file-input" multiple accept="*/*" style="display: none;" onchange="handleFileSelect(event)">
+                    </div>
+                </div>
+
+                <div id="file-info" class="file-info" style="display: none;">
+                    <h3>File Ready to Send</h3>
+                    <div class="file-details">
+                        <div id="file-list">
+                            <!-- Files will be listed here -->
+                        </div>
+                        <div class="total-info">
+                            <p><strong>Total Files:</strong> <span id="total-files">0</span></p>
+                            <p><strong>Total Size:</strong> <span id="total-size">0 Bytes</span></p>
+                        </div>
+                    </div>
+                    <div class="share-link">
+                        <p><strong>Share this link:</strong></p>
+                        <div class="link-container">
+                            <input type="text" id="share-link" readonly>
+                            <button type="button" class="btn btn-secondary" onclick="copyLink()">Copy</button>
+                        </div>
+                    </div>
+                    <div id="connection-status" class="status">
+                        <p>Waiting for recipient to connect...</p>
+                    </div>
+                    <div id="transfer-progress" class="progress-container" style="display: none;">
+                        <div class="file-progress">
+                            <p><strong>Current File:</strong> <span id="current-file-name">-</span></p>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="progress-fill"></div>
+                            </div>
+                            <p id="progress-text">0%</p>
+                        </div>
+                        <div class="overall-progress">
+                            <p><strong>Overall Progress:</strong> <span id="overall-progress-text">0 of 0 files</span></p>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="overall-progress-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- File Receiver Section -->
+            <section id="receiver-section" class="card" style="display: none;">
+                <h2>Receive File</h2>
+                <div id="receiver-info">
+                    <p>Connecting to sender...</p>
+                    <div id="receiver-progress" class="progress-container" style="display: none;">
+                        <div class="file-progress">
+                            <p><strong>Current File:</strong> <span id="receiver-current-file-name">-</span></p>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="receiver-progress-fill"></div>
+                            </div>
+                            <p id="receiver-progress-text">0%</p>
+                        </div>
+                        <div class="overall-progress">
+                            <p><strong>Overall Progress:</strong> <span id="receiver-overall-progress-text">0 of 0 files</span></p>
+                            <div class="progress-bar">
+                                <div class="progress-fill" id="receiver-overall-progress-fill"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- FAQ Section -->
+            <section class="card">
+                <h2>FAQ</h2>
+                <div class="faq-container">
+                    <details class="faq-item">
+                        <summary>How is this secure?</summary>
+                        <p>Files never touch our servers. They transfer directly between peers using <a href="https://webrtc.org/" target="_blank" rel="noopener">WebRTC</a>. Our server only helps peers discover each other. We use Google's free public <a href="https://en.wikipedia.org/wiki/STUN" target="_blank" rel="noopener">STUN servers</a> (<code>stun:stun.l.google.com:19302</code>) for NAT traversal, which helps peers discover their public IP addresses without ever seeing your files.</p>
+                    </details>
+                    
+                    <details class="faq-item">
+                        <summary>What dependencies do you need?</summary>
+                        <p> <a href="https://peerjs.com/" target="_blank" rel="noopener">PeerJS</a> for signaling and <a href="https://expressjs.com/" target="_blank" rel="noopener">Express</a> for static files.</p>
+                    </details>
+
+                    <details class="faq-item">
+                        <summary>Are there any transfer limits?</summary>
+                        <p>No, there are no transfer limits. There might be issues when using Safari, because it loads the files into memory instead of streaming them as chunks before writing them to disk.</p>
+                    </details>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2025 send.me.it. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"  # Frontend and static file server
+      - "9000:9000"  # PeerJS signaling server
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - PEER_PORT=9000
+    restart: unless-stopped
+    volumes:
+      - ./logs:/app/logs
