@@ -1,6 +1,6 @@
 # Send.me.it
 
-P2P file transfer. Files go directly between peers - server only handles signaling.
+P2P file transfer. Files go directly between peers, the server only handles signaling.
 
 ## Setup
 
