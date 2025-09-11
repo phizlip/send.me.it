@@ -1,4 +1,4 @@
-# Send.me.it
+# send.me.it
 
 P2P file transfer. Files go directly between peers, the server only handles signaling.
 
