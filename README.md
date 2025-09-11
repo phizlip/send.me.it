@@ -2,7 +2,7 @@
 
 P2P file transfer. Files go directly between peers, the server only handles signaling.
 
-## Setup
+## Development Setup
 
 ```bash
 npm install
@@ -11,7 +11,7 @@ npm run dev
 
 Open http://localhost:8080
 
-## Docker
+## Deployment Setup via Docker
 
 ```bash
 docker compose up --build
