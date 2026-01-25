@@ -103,15 +103,21 @@ function displayFileList() {
     });
 }
 
+function getPeerConfig() {
+    const isSecure = window.location.protocol === 'https:';
+    return {
+        host: window.location.hostname,
+        port: isSecure ? (parseInt(window.location.port) || 443) : 9000,
+        path: '/peerjs',
+        secure: isSecure,
+        debug: 2
+    };
+}
+
 function initializePeer() {
     const peerId = generatePeerId();
     
-    peer = new Peer(peerId, {
-        host: window.location.hostname,
-        port: 9000,
-        path: '/peerjs',
-        debug: 2
-    });
+    peer = new Peer(peerId, getPeerConfig());
     
     peer.on('open', function(id) {
         const shareLink = `${window.location.origin}${window.location.pathname}?peer=${id}`;
@@ -285,12 +291,7 @@ function sendFileInChunks(conn, file) {
 }
 
 function connectToPeer(peerId) {
-    peer = new Peer({
-        host: window.location.hostname,
-        port: 9000,
-        path: '/peerjs',
-        debug: 2
-    });
+    peer = new Peer(getPeerConfig());
     
     peer.on('open', function(id) {
         const conn = peer.connect(peerId);
