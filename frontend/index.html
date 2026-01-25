@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>send.me.it - P2P File Transfer</title>
     
-    <!-- Discord/Open Graph Meta Tags -->
+    <!-- Discord embed -->
     <meta property="og:title" content="send.me.it">
     <meta property="og:description" content="Secure P2P file transfer">
     <meta property="og:type" content="website">
@@ -25,8 +25,7 @@
 
         <main>
             <!-- File Sender Section -->
-            <section id="sender-section" class="card">
-                <h2>Send file(s)</h2>
+            <section id="sender-section">
                 <div class="drop-zone" id="drop-zone">
                     <div class="drop-zone-content">
                         <div class="upload-icon">+</div>
@@ -37,91 +36,95 @@
                 </div>
 
                 <div id="file-info" class="file-info" style="display: none;">
-                    <h3>File Ready to Send</h3>
-                    <div class="file-details">
-                        <div id="file-list">
-                            <!-- Files will be listed here -->
-                        </div>
-                        <div class="total-info">
-                            <p><strong>Total Files:</strong> <span id="total-files">0</span></p>
-                            <p><strong>Total Size:</strong> <span id="total-size">0 Bytes</span></p>
-                        </div>
-                    </div>
+                    <div id="file-list"></div>
+                    
                     <div class="share-link">
-                        <p><strong>Share this link:</strong></p>
                         <div class="link-container">
-                            <input type="text" id="share-link" readonly>
-                            <button type="button" class="btn btn-secondary" onclick="copyLink()">Copy</button>
+                            <input type="text" id="share-link" readonly placeholder="Generating link...">
+                            <button type="button" class="btn" onclick="copyLink()">Copy</button>
                         </div>
                     </div>
-                    <div id="connection-status" class="status">
-                        <p>Waiting for recipient to connect...</p>
-                    </div>
-                    <div id="transfer-progress" class="progress-container" style="display: none;">
-                        <div class="file-progress">
-                            <p><strong>Current File:</strong> <span id="current-file-name">-</span></p>
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="progress-fill"></div>
-                            </div>
-                            <p id="progress-text">0%</p>
+                    
+                    <p class="warning">Do not close this tab during transfer.</p>
+                    
+                    <div id="connection-status" class="status-box">
+                        <div class="status-row" id="status-message">
+                            <span>Waiting for recipient...</span>
                         </div>
-                        <div class="overall-progress">
-                            <p><strong>Overall Progress:</strong> <span id="overall-progress-text">0 of 0 files</span></p>
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="overall-progress-fill"></div>
-                            </div>
+                        <div class="status-row" id="status-file" style="display: none;">
+                            <span>File:</span>
+                            <span id="status-file-value">-</span>
+                        </div>
+                        <div class="status-row" id="status-progress" style="display: none;">
+                            <span>Progress:</span>
+                            <span id="status-progress-value">0%</span>
+                        </div>
+                        <div class="status-row" id="status-speed" style="display: none;">
+                            <span>Speed:</span>
+                            <span id="status-speed-value">0 MB/s</span>
+                        </div>
+                        <div class="status-row" id="status-eta" style="display: none;">
+                            <span>ETA:</span>
+                            <span id="status-eta-value">...</span>
+                        </div>
+                        <div class="status-row" id="status-overall" style="display: none;">
+                            <span>Overall:</span>
+                            <span id="status-overall-value">0 of 0 files</span>
                         </div>
                     </div>
+                    
+                    <button type="button" class="btn btn-cancel" id="sender-cancel-btn" onclick="cancelTransfer()">Cancel Transfer</button>
                 </div>
             </section>
 
             <!-- File Receiver Section -->
-            <section id="receiver-section" class="card" style="display: none;">
-                <h2>Receive File</h2>
-                <div id="receiver-info">
-                    <p>Connecting to sender...</p>
-                    <div id="receiver-progress" class="progress-container" style="display: none;">
-                        <div class="file-progress">
-                            <p><strong>Current File:</strong> <span id="receiver-current-file-name">-</span></p>
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="receiver-progress-fill"></div>
-                            </div>
-                            <p id="receiver-progress-text">0%</p>
-                        </div>
-                        <div class="overall-progress">
-                            <p><strong>Overall Progress:</strong> <span id="receiver-overall-progress-text">0 of 0 files</span></p>
-                            <div class="progress-bar">
-                                <div class="progress-fill" id="receiver-overall-progress-fill"></div>
-                            </div>
-                        </div>
+            <section id="receiver-section" style="display: none;">
+                <h2>Receiving File</h2>
+                <p class="warning">Do not close this tab during transfer.</p>
+                <div id="receiver-info" class="status-box">
+                    <div class="status-row" id="receiver-status-message">
+                        <span>Connecting to sender...</span>
+                    </div>
+                    <div class="status-row" id="receiver-status-file" style="display: none;">
+                        <span>File:</span>
+                        <span id="receiver-status-file-value">-</span>
+                    </div>
+                    <div class="status-row" id="receiver-status-size" style="display: none;">
+                        <span>Size:</span>
+                        <span id="receiver-status-size-value">-</span>
+                    </div>
+                    <div class="status-row" id="receiver-status-progress" style="display: none;">
+                        <span>Progress:</span>
+                        <span id="receiver-status-progress-value">0%</span>
+                    </div>
+                    <div class="status-row" id="receiver-status-speed" style="display: none;">
+                        <span>Speed:</span>
+                        <span id="receiver-status-speed-value">0 MB/s</span>
+                    </div>
+                    <div class="status-row" id="receiver-status-eta" style="display: none;">
+                        <span>ETA:</span>
+                        <span id="receiver-status-eta-value">...</span>
+                    </div>
+                    <div class="status-row" id="receiver-status-overall" style="display: none;">
+                        <span>Overall:</span>
+                        <span id="receiver-status-overall-value">0 of 0 files</span>
                     </div>
                 </div>
-            </section>
-
-            <!-- FAQ Section -->
-            <section class="card">
-                <h2>FAQ</h2>
-                <div class="faq-container">
-                    <details class="faq-item">
-                        <summary>How is this secure?</summary>
-                        <p>Files never touch our servers. They transfer directly between peers using <a href="https://webrtc.org/" target="_blank" rel="noopener">WebRTC</a>. Our server only helps peers discover each other. We use Google's free public <a href="https://en.wikipedia.org/wiki/STUN" target="_blank" rel="noopener">STUN servers</a> (<code>stun:stun.l.google.com:19302</code>) for NAT traversal, which helps peers discover their public IP addresses without ever seeing your files.</p>
-                    </details>
-                    
-                    <details class="faq-item">
-                        <summary>What dependencies do you need?</summary>
-                        <p> <a href="https://peerjs.com/" target="_blank" rel="noopener">PeerJS</a> for signaling and <a href="https://expressjs.com/" target="_blank" rel="noopener">Express</a> for static files.</p>
-                    </details>
-
-                    <details class="faq-item">
-                        <summary>Are there any transfer limits?</summary>
-                        <p>No, there are no transfer limits. There might be issues when using Safari, because it loads the files into memory instead of streaming them as chunks before writing them to disk.</p>
-                    </details>
-                </div>
+                
+                <button type="button" class="btn btn-cancel" id="receiver-cancel-btn" onclick="cancelTransfer()">Cancel Transfer</button>
             </section>
         </main>
 
         <footer class="footer">
-            <p>&copy; 2025 send.me.it. All rights reserved.</p>
+            <p>
+                <a href="faq.html">FAQ</a> | 
+                <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener">AGPL-3.0</a> | 
+                <a href="https://github.com/phizlip/send.me.it" target="_blank" rel="noopener" title="GitHub">
+                    <svg height="16" width="16" viewBox="0 0 16 16" style="vertical-align: middle;">
+                        <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+                    </svg>
+                </a>
+            </p>
         </footer>
     </div>
 

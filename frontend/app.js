@@ -4,6 +4,8 @@ let currentFileIndex = 0;
 let currentConnection = null;
 let isReceiver = false;
 let globalTransferStartTime = null;
+let confirmedChunks = 0;
+let transferCancelled = false;
 
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
@@ -11,6 +13,13 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeApp() {
+    // Check for any stored message from cancelled transfer
+    const transferMessage = sessionStorage.getItem('transferMessage');
+    if (transferMessage) {
+        sessionStorage.removeItem('transferMessage');
+        alert(transferMessage);
+    }
+    
     const urlParams = new URLSearchParams(window.location.search);
     const peerId = urlParams.get('peer');
     
@@ -61,17 +70,11 @@ function setupDragAndDrop() {
 }
 
 function handleFileSelect(event) {
-    console.log('File input change event triggered');
-    console.log('Files selected:', event.target.files);
-    
     const files = Array.from(event.target.files);
-    console.log('Files array:', files);
     
     if (files.length > 0) {
         selectedFiles = files;
         currentFileIndex = 0;
-        
-        console.log('Selected files:', selectedFiles);
         
         displayFileList();
         
@@ -83,28 +86,21 @@ function handleFileSelect(event) {
 
 function displayFileList() {
     const fileList = document.getElementById('file-list');
-    const totalFiles = document.getElementById('total-files');
-    const totalSize = document.getElementById('total-size');
     
     fileList.innerHTML = '';
     
-    const totalBytes = selectedFiles.reduce((sum, file) => sum + file.size, 0);
-    
-        selectedFiles.forEach((file, index) => {
-            const fileItem = document.createElement('div');
-            fileItem.className = 'file-item';
-            fileItem.innerHTML = `
-                <div class="file-info">
-                    <div class="file-name">${file.name}</div>
-                    <div class="file-size">${formatFileSize(file.size)}</div>
-                </div>
-                <span class="file-remove" onclick="removeFile(${index})" title="Remove file">×</span>
-            `;
-            fileList.appendChild(fileItem);
-        });
-    
-    totalFiles.textContent = selectedFiles.length;
-    totalSize.textContent = formatFileSize(totalBytes);
+    selectedFiles.forEach((file, index) => {
+        const fileItem = document.createElement('div');
+        fileItem.className = 'file-item';
+        fileItem.innerHTML = `
+            <div class="file-info">
+                <div class="file-name">${file.name}</div>
+                <div class="file-size">${formatFileSize(file.size)}</div>
+            </div>
+            <button type="button" class="btn btn-remove" onclick="removeFile(${index})" title="Remove file">X</button>
+        `;
+        fileList.appendChild(fileItem);
+    });
 }
 
 function initializePeer() {
@@ -112,13 +108,12 @@ function initializePeer() {
     
     peer = new Peer(peerId, {
         host: window.location.hostname,
+        port: 9000,
         path: '/peerjs',
         debug: 2
     });
     
     peer.on('open', function(id) {
-        console.log('Peer connection opened with ID:', id);
-        
         const shareLink = `${window.location.origin}${window.location.pathname}?peer=${id}`;
         document.getElementById('share-link').value = shareLink;
         
@@ -142,6 +137,8 @@ function handleConnection(conn) {
     updateStatus('Recipient connected! Starting file transfer...');
     
     globalTransferStartTime = Date.now();
+    confirmedChunks = 0;
+    transferCancelled = false;
     
     conn.on('open', function() {
         sendNextFile(conn);
@@ -151,14 +148,13 @@ function handleConnection(conn) {
         if (data.type === 'transfer_complete') {
             const totalTime = data.totalTime;
             const senderTotalTime = globalTransferStartTime ? (Date.now() - globalTransferStartTime) / 1000 : 0;
-            updateStatus(`All files transferred successfully! Receiver time: ${Math.round(totalTime)}s, Sender time: ${Math.round(senderTotalTime)}s`);
-        } else if (data.type === 'speed_update') {
-            receiverSpeed = data.speed;
+            updateStatus(`TRANSFER COMPLETE - All files received successfully! (${Math.round(senderTotalTime)}s)`, true);
+        } else if (data.type === 'chunk_ack') {
+            confirmedChunks = data.confirmedIndex;
         } else if (data.type === 'file_received') {
-            updateStatus(`File ${currentFileIndex + 1} confirmed received! Moving to next file...`);
+            updateStatus(`File ${currentFileIndex + 1} confirmed received by recipient.`);
             currentFileIndex++;
-            
-            updateOverallProgress();
+            confirmedChunks = 0;
             
             if (currentFileIndex < selectedFiles.length) {
                 setTimeout(() => {
@@ -166,103 +162,39 @@ function handleConnection(conn) {
                 }, 500);
             } else {
                 conn.send({ type: 'complete' });
-                updateStatus('All files sent! Waiting for receiver to confirm... DO NOT CLOSE THIS TAB!');
+                updateStatus('All files sent and confirmed! You may close this tab.', true);
             }
+        } else if (data.type === 'transfer_cancelled') {
+            transferCancelled = true;
+            sessionStorage.setItem('transferMessage', 'Transfer cancelled by recipient.');
+            window.location.href = window.location.origin + window.location.pathname;
+        }
+    });
+    
+    conn.on('close', function() {
+        if (!transferCancelled) {
+            // Connection closed without explicit cancel - recipient likely cancelled
+            transferCancelled = true;
+            sessionStorage.setItem('transferMessage', 'Transfer cancelled by recipient.');
+            window.location.href = window.location.origin + window.location.pathname;
         }
     });
     
     conn.on('error', function(err) {
         console.error('Connection error:', err);
-        updateStatus('Transfer error: ' + err.message);
+        if (!transferCancelled) {
+            updateStatus('Transfer error: ' + err.message);
+        }
     });
-}
-
-function sendFileInChunks(conn) {
-    const chunkSize = 16384;
-    const totalChunks = Math.ceil(currentFile.size / chunkSize);
-    let currentChunk = 0;
-    let startTime = Date.now();
-    let speedHistory = [];
-    let lastUpdateTime = startTime;
-    let receiverSpeed = null;
-    
-    const reader = new FileReader();
-    
-    reader.onload = function(e) {
-        const chunk = e.target.result;
-        const chunkData = {
-            type: 'chunk',
-            data: chunk,
-            index: currentChunk,
-            total: totalChunks
-        };
-        
-        conn.send(chunkData);
-        currentChunk++;
-        
-        const progress = Math.round((currentChunk / totalChunks) * 100);
-        updateProgress(progress);
-        
-        if (currentChunk % 100 === 0 || currentChunk === totalChunks) {
-            const now = Date.now();
-            const elapsed = (now - startTime) / 1000;
-            const bytesSent = currentChunk * chunkSize;
-            
-            const currentSpeed = bytesSent / elapsed;
-            
-            speedHistory.push(currentSpeed);
-            if (speedHistory.length > 5) {
-                speedHistory.shift();
-            }
-            
-            const smoothedSpeed = speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length;
-            
-            conn.send({ type: 'speed_update', speed: smoothedSpeed });
-            
-            // The transfer is limited by the slower of upload vs download speeds
-            let effectiveTransferRate = smoothedSpeed * 0.8;
-            const remainingChunks = totalChunks - currentChunk;
-            
-            if (receiverSpeed) {
-                effectiveTransferRate = Math.min(smoothedSpeed, receiverSpeed);
-                const eta = Math.round(remainingChunks * (chunkSize / effectiveTransferRate));
-                updateStatus(`Sending: ${progress}% - ${formatFileSize(smoothedSpeed)}/s (upload) / ${formatFileSize(receiverSpeed)}/s (download) - ETA: <span class="eta-number">${eta.toString().padStart(3, ' ')}</span>s (bottleneck: ${formatFileSize(effectiveTransferRate)}/s)`);
-            } else {
-                const eta = Math.round(remainingChunks * (chunkSize / effectiveTransferRate));
-                updateStatus(`Sending: ${progress}% - ${formatFileSize(smoothedSpeed)}/s - ETA: <span class="eta-number">${eta.toString().padStart(3, ' ')}</span>s (bottleneck-aware)`);
-            }
-            
-            lastUpdateTime = now;
-        }
-        
-        if (currentChunk < totalChunks) {
-            const start = currentChunk * chunkSize;
-            const end = Math.min(start + chunkSize, currentFile.size);
-            reader.readAsArrayBuffer(currentFile.slice(start, end));
-        } else {
-            conn.send({ type: 'complete' });
-            updateStatus('File sent! Waiting for receiver to confirm... DO NOT CLOSE THIS TAB!');
-        }
-    };
-    
-    reader.onerror = function() {
-        updateStatus('Error reading file');
-    };
-    
-    const start = 0;
-    const end = Math.min(chunkSize, currentFile.size);
-    reader.readAsArrayBuffer(currentFile.slice(start, end));
 }
 
 function sendNextFile(conn) {
     if (currentFileIndex >= selectedFiles.length) {
-        updateStatus('All files sent! Waiting for receiver to confirm... DO NOT CLOSE THIS TAB!');
+        updateStatus('All files sent and confirmed! You may close this tab.', true);
         return;
     }
     
     const currentFile = selectedFiles[currentFileIndex];
-    
-    document.getElementById('current-file-name').textContent = currentFile.name;
     
     const metadata = {
         type: 'metadata',
@@ -282,13 +214,16 @@ function sendFileInChunks(conn, file) {
     const totalChunks = Math.ceil(file.size / chunkSize);
     let currentChunk = 0;
     let startTime = Date.now();
-    let speedHistory = [];
-    let lastUpdateTime = startTime;
-    let receiverSpeed = null;
+    let lastUpdateTime = 0;
     
     const reader = new FileReader();
     
     reader.onload = function(e) {
+        // Stop if transfer was cancelled
+        if (transferCancelled || !conn.open) {
+            return;
+        }
+        
         const chunk = e.target.result;
         const chunkData = {
             type: 'chunk',
@@ -300,40 +235,34 @@ function sendFileInChunks(conn, file) {
         conn.send(chunkData);
         currentChunk++;
         
-        const progress = Math.round((currentChunk / totalChunks) * 100);
-        updateProgress(progress);
+        const now = Date.now();
+        const timeSinceLastUpdate = now - lastUpdateTime;
         
-        updateOverallProgress();
-        
-        if (currentChunk % 100 === 0 || currentChunk === totalChunks) {
-            const now = Date.now();
-            const elapsed = (now - startTime) / 1000;
-            const bytesSent = currentChunk * chunkSize;
-            
-            const currentSpeed = bytesSent / elapsed;
-            
-            speedHistory.push(currentSpeed);
-            if (speedHistory.length > 5) {
-                speedHistory.shift();
-            }
-            
-            const smoothedSpeed = speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length;
-            
-            conn.send({ type: 'speed_update', speed: smoothedSpeed });
-            
-            // The transfer is limited by the slower of upload vs download speeds
-            let effectiveTransferRate = smoothedSpeed * 0.8;
-            const remainingChunks = totalChunks - currentChunk;
-            
-            if (receiverSpeed) {
-                effectiveTransferRate = Math.min(smoothedSpeed, receiverSpeed);
-                updateStatus(`Sending file ${currentFileIndex + 1} of ${selectedFiles.length}: ${progress}% - ${formatFileSize(smoothedSpeed)}/s (upload) / ${formatFileSize(receiverSpeed)}/s (download) - ETA: <span class="eta-number">${Math.round(remainingChunks * (chunkSize / effectiveTransferRate))}</span>s (bottleneck: ${formatFileSize(effectiveTransferRate)}/s)`);
-            } else {
-                const eta = remainingChunks * (chunkSize / effectiveTransferRate);
-                updateStatus(`Sending file ${currentFileIndex + 1} of ${selectedFiles.length}: ${progress}% - ${formatFileSize(smoothedSpeed)}/s - ETA: <span class="eta-number">${Math.round(eta)}</span>s (bottleneck-aware)`);
-            }
-            
+        // Update progress once per second or on completion
+        if (timeSinceLastUpdate >= 1000 || currentChunk === totalChunks) {
             lastUpdateTime = now;
+            
+            const sentProgress = Math.round((currentChunk / totalChunks) * 100);
+            const confirmedProgress = Math.round((confirmedChunks / totalChunks) * 100);
+            const elapsed = (now - startTime) / 1000;
+            const bytesConfirmed = confirmedChunks * chunkSize;
+            const speed = bytesConfirmed / elapsed;
+            const remainingBytes = file.size - bytesConfirmed;
+            const eta = speed > 0 ? Math.round(remainingBytes / speed) + 's' : '...';
+            
+            updateSenderProgress(
+                file.name,
+                sentProgress,
+                confirmedProgress,
+                formatFileSize(speed) + '/s',
+                eta,
+                currentFileIndex,
+                selectedFiles.length
+            );
+        }
+        
+        if (transferCancelled || !conn.open) {
+            return;
         }
         
         if (currentChunk < totalChunks) {
@@ -342,7 +271,7 @@ function sendFileInChunks(conn, file) {
             reader.readAsArrayBuffer(file.slice(start, end));
         } else {
             conn.send({ type: 'file_complete', fileIndex: currentFileIndex });
-            updateStatus(`File ${currentFileIndex + 1} of ${selectedFiles.length} sent! Waiting for receiver confirmation...`);
+            updateStatus(`File ${currentFileIndex + 1}/${selectedFiles.length} sent. Waiting for confirmation...`);
         }
     };
     
@@ -358,17 +287,18 @@ function sendFileInChunks(conn, file) {
 function connectToPeer(peerId) {
     peer = new Peer({
         host: window.location.hostname,
+        port: 9000,
         path: '/peerjs',
         debug: 2
     });
     
     peer.on('open', function(id) {
-        console.log('Receiver peer opened with ID:', id);
-        
         const conn = peer.connect(peerId);
         
         conn.on('open', function() {
-            updateReceiverStatus('Connected to sender. Receiving file...');
+            currentConnection = conn;
+            transferCancelled = false;
+            updateReceiverStatus('Connected to sender. Waiting for file...');
             setupReceiverConnection(conn);
         });
         
@@ -391,11 +321,10 @@ function setupReceiverConnection(conn) {
     let receivedChunksCount = 0;
     let globalStartTime = Date.now();
     let fileStartTime = Date.now();
-    let speedHistory = [];
-    let senderSpeed = null;
     let totalFiles = 0;
     let currentFileIndex = 0;
     let receivedFiles = [];
+    let lastUpdateTime = 0;
     
     conn.on('data', function(data) {
         if (data.type === 'metadata') {
@@ -407,85 +336,87 @@ function setupReceiverConnection(conn) {
             totalFiles = data.totalFiles || 1;
             currentFileIndex = data.fileIndex || 0;
             
-            document.getElementById('receiver-current-file-name').textContent = data.name;
-            
-            updateReceiverOverallProgress(currentFileIndex, totalFiles);
-            
-            updateReceiverStatus(`Receiving file ${currentFileIndex + 1} of ${totalFiles}: ${data.name} (${formatFileSize(data.size)})`);
-            showReceiverProgress();
+            updateReceiverStatus(`Receiving file ${currentFileIndex + 1}/${totalFiles}: ${data.name} (${formatFileSize(data.size)})`);
         } else if (data.type === 'chunk') {
             receivedChunks[data.index] = data.data;
             receivedChunksCount++;
             
             const progress = Math.round((receivedChunksCount / totalChunks) * 100);
-            updateReceiverProgress(progress);
+            // Progress is now shown in the status box
             
-                   if (receivedChunksCount % 100 === 0 || receivedChunksCount === totalChunks) {
-                       const now = Date.now();
-                       const elapsed = (now - fileStartTime) / 1000;
-                       const bytesReceived = receivedChunksCount * 16384;
-                
-                const currentSpeed = bytesReceived / elapsed;
-                
-                speedHistory.push(currentSpeed);
-                if (speedHistory.length > 5) {
-                    speedHistory.shift();
-                }
-                
-                const smoothedSpeed = speedHistory.reduce((a, b) => a + b, 0) / speedHistory.length;
-                
-                conn.send({ type: 'speed_update', speed: smoothedSpeed });
-                
-                // The transfer is limited by the slower of upload vs download speeds
-                let effectiveTransferRate = smoothedSpeed * 0.8;
-                const remainingChunks = totalChunks - receivedChunksCount;
-                
-                if (senderSpeed) {
-                    effectiveTransferRate = Math.min(smoothedSpeed, senderSpeed);
-                    const eta = Math.round(remainingChunks * (16384 / effectiveTransferRate));
-                    updateReceiverStatus(`Receiving: ${progress}% - ${formatFileSize(smoothedSpeed)}/s (download) / ${formatFileSize(senderSpeed)}/s (upload) - ETA: <span class="eta-number">${eta.toString().padStart(3, ' ')}</span>s (bottleneck: ${formatFileSize(effectiveTransferRate)}/s)`);
-                } else {
-                    const eta = Math.round(remainingChunks * (16384 / effectiveTransferRate));
-                    updateReceiverStatus(`Receiving: ${progress}% - ${formatFileSize(smoothedSpeed)}/s - ETA: <span class="eta-number">${eta.toString().padStart(3, ' ')}</span>s (bottleneck-aware)`);
-                }
+            // Send ACK every 50 chunks
+            if (receivedChunksCount % 50 === 0) {
+                conn.send({ type: 'chunk_ack', confirmedIndex: receivedChunksCount });
             }
-        } else if (data.type === 'speed_update') {
-            senderSpeed = data.speed;
-                } else if (data.type === 'file_complete') {
-            const fileBlob = new Blob(receivedChunks);
+            
+            const now = Date.now();
+            const timeSinceLastUpdate = now - lastUpdateTime;
+            
+            // Update progress once per second or on completion
+            if (timeSinceLastUpdate >= 1000 || receivedChunksCount === totalChunks) {
+                lastUpdateTime = now;
+                
+                const elapsed = (now - fileStartTime) / 1000;
+                const bytesReceived = receivedChunksCount * 16384;
+                const speed = bytesReceived / elapsed;
+                const remainingBytes = (totalChunks - receivedChunksCount) * 16384;
+                const eta = speed > 0 ? Math.round(remainingBytes / speed) + 's' : '...';
+                
+                updateReceiverProgress(
+                    fileMetadata.name,
+                    formatFileSize(fileMetadata.size),
+                    progress,
+                    formatFileSize(speed) + '/s',
+                    eta,
+                    currentFileIndex,
+                    totalFiles
+                );
+            }
+        } else if (data.type === 'file_complete') {
+            // Send final ACK for this file
+            conn.send({ type: 'chunk_ack', confirmedIndex: receivedChunksCount });
+            
+            // Filter out any undefined entries from sparse array
+            const validChunks = receivedChunks.filter(chunk => chunk !== undefined);
+            
+            // Log warning if chunks are missing
+            if (validChunks.length !== totalChunks) {
+                console.warn(`Missing chunks: expected ${totalChunks}, got ${validChunks.length}`);
+            }
+            
+            const fileBlob = new Blob(validChunks);
             receivedFiles.push({
                 name: fileMetadata.name,
                 blob: fileBlob
             });
 
-            // Download the file immediately for all files except the last one
             downloadFile(fileBlob, fileMetadata.name);
 
-            updateReceiverStatus(`File ${currentFileIndex + 1} of ${totalFiles} received! Confirming to sender...`);
+            updateReceiverStatus(`FILE RECEIVED: ${fileMetadata.name} - Download started!`);
 
             conn.send({ type: 'file_received', fileIndex: currentFileIndex });
 
             receivedChunks = [];
             receivedChunksCount = 0;
-            speedHistory = [];
             fileStartTime = Date.now();
         } else if (data.type === 'complete') {
-            // Only download the last file if there are still chunks to process
-            if (receivedChunksCount > 0) {
-                const fileBlob = new Blob(receivedChunks);
-                receivedFiles.push({
-                    name: fileMetadata.name,
-                    blob: fileBlob
-                });
-                
-                // Download the last file, prevents 0 byte ghost files
-                downloadFile(fileBlob, fileMetadata.name);
-            }
-            
             const totalTime = (Date.now() - globalStartTime) / 1000;
-            updateReceiverStatus(`All ${totalFiles} files received successfully in ${Math.round(totalTime)}s! (Total transfer time)`);
+            updateReceiverStatus(`TRANSFER COMPLETE - All ${totalFiles} file(s) received in ${Math.round(totalTime)}s!`, true);
             
             conn.send({ type: 'transfer_complete', totalTime: totalTime });
+        } else if (data.type === 'transfer_cancelled') {
+            transferCancelled = true;
+            sessionStorage.setItem('transferMessage', 'Transfer cancelled by sender.');
+            window.location.href = window.location.origin + window.location.pathname;
+        }
+    });
+    
+    conn.on('close', function() {
+        if (!transferCancelled) {
+            // Connection closed without explicit cancel - sender likely cancelled
+            transferCancelled = true;
+            sessionStorage.setItem('transferMessage', 'Transfer cancelled by sender.');
+            window.location.href = window.location.origin + window.location.pathname;
         }
     });
 }
@@ -502,52 +433,92 @@ function downloadFile(blob, filename) {
 }
 
 function showSenderSection() {
-    document.getElementById('sender-section').style.display = 'block';
+    document.getElementById('sender-section').style.display = 'flex';
     document.getElementById('receiver-section').style.display = 'none';
 }
 
 function showReceiverSection() {
     document.getElementById('sender-section').style.display = 'none';
-    document.getElementById('receiver-section').style.display = 'block';
+    document.getElementById('receiver-section').style.display = 'flex';
 }
 
-function updateStatus(message) {
-    const statusElement = document.getElementById('connection-status');
-    statusElement.innerHTML = `<p>${message}</p>`;
-}
-
-function updateReceiverStatus(message) {
-    const statusElement = document.getElementById('receiver-info');
-    const firstParagraph = statusElement.querySelector('p');
-    if (firstParagraph) {
-        firstParagraph.innerHTML = message;
+function updateStatus(message, isComplete = false) {
+    const messageEl = document.getElementById('status-message');
+    
+    // Hide all progress rows, show message only
+    messageEl.style.display = 'flex';
+    messageEl.querySelector('span').textContent = message;
+    
+    ['status-file', 'status-progress', 'status-speed', 'status-eta', 'status-overall'].forEach(id => {
+        document.getElementById(id).style.display = 'none';
+    });
+    
+    if (isComplete) {
+        document.getElementById('connection-status').className = 'status-complete';
+        document.getElementById('sender-cancel-btn').style.display = 'none';
     } else {
-        statusElement.innerHTML = `<p>${message}</p>`;
+        document.getElementById('connection-status').className = 'status-box';
     }
 }
 
-function showReceiverProgress() {
-    document.getElementById('receiver-progress').style.display = 'block';
-}
-
-function updateProgress(percentage) {
-    document.getElementById('progress-fill').style.width = percentage + '%';
-    document.getElementById('progress-text').textContent = percentage + '%';
+function updateSenderProgress(fileName, sentPercent, confirmedPercent, speed, eta, fileIndex, totalFiles) {
+    document.getElementById('status-message').style.display = 'none';
     
-    if (percentage > 0) {
-        document.getElementById('transfer-progress').style.display = 'block';
+    document.getElementById('status-file-value').textContent = fileName;
+    document.getElementById('status-file').style.display = 'flex';
+    
+    document.getElementById('status-progress-value').textContent = `Sent ${sentPercent}% | Confirmed ${confirmedPercent}%`;
+    document.getElementById('status-progress').style.display = 'flex';
+    
+    document.getElementById('status-speed-value').textContent = speed;
+    document.getElementById('status-speed').style.display = 'flex';
+    
+    document.getElementById('status-eta-value').textContent = eta;
+    document.getElementById('status-eta').style.display = 'flex';
+    
+    document.getElementById('status-overall-value').textContent = `${fileIndex} of ${totalFiles} files`;
+    document.getElementById('status-overall').style.display = 'flex';
+}
+
+function updateReceiverStatus(message, isComplete = false) {
+    const messageEl = document.getElementById('receiver-status-message');
+    
+    // Hide all progress rows, show message only
+    messageEl.style.display = 'flex';
+    messageEl.querySelector('span').textContent = message;
+    
+    ['receiver-status-file', 'receiver-status-size', 'receiver-status-progress', 'receiver-status-speed', 'receiver-status-eta', 'receiver-status-overall'].forEach(id => {
+        document.getElementById(id).style.display = 'none';
+    });
+    
+    if (isComplete) {
+        document.getElementById('receiver-info').className = 'status-complete';
+        document.getElementById('receiver-cancel-btn').style.display = 'none';
+    } else {
+        document.getElementById('receiver-info').className = 'status-box';
     }
 }
 
-function updateOverallProgress() {
-    const overallProgressFill = document.getElementById('overall-progress-fill');
-    const overallProgressText = document.getElementById('overall-progress-text');
+function updateReceiverProgress(fileName, fileSize, percent, speed, eta, fileIndex, totalFiles) {
+    document.getElementById('receiver-status-message').style.display = 'none';
     
-    if (overallProgressFill && overallProgressText) {
-        const overallProgress = Math.round(((currentFileIndex) / selectedFiles.length) * 100);
-        overallProgressFill.style.width = overallProgress + '%';
-        overallProgressText.textContent = `${currentFileIndex} of ${selectedFiles.length} files`;
-    }
+    document.getElementById('receiver-status-file-value').textContent = fileName;
+    document.getElementById('receiver-status-file').style.display = 'flex';
+    
+    document.getElementById('receiver-status-size-value').textContent = fileSize;
+    document.getElementById('receiver-status-size').style.display = 'flex';
+    
+    document.getElementById('receiver-status-progress-value').textContent = percent + '%';
+    document.getElementById('receiver-status-progress').style.display = 'flex';
+    
+    document.getElementById('receiver-status-speed-value').textContent = speed;
+    document.getElementById('receiver-status-speed').style.display = 'flex';
+    
+    document.getElementById('receiver-status-eta-value').textContent = eta;
+    document.getElementById('receiver-status-eta').style.display = 'flex';
+    
+    document.getElementById('receiver-status-overall-value').textContent = `${fileIndex} of ${totalFiles} files`;
+    document.getElementById('receiver-status-overall').style.display = 'flex';
 }
 
 function removeFile(index) {
@@ -561,27 +532,11 @@ function removeFile(index) {
     
     if (selectedFiles.length === 0) {
         document.getElementById('file-info').style.display = 'none';
+        document.getElementById('file-input').value = '';
         if (peer) {
             peer.destroy();
             peer = null;
         }
-    }
-}
-
-function updateReceiverProgress(percentage) {
-    document.getElementById('receiver-progress-fill').style.width = percentage + '%';
-    document.getElementById('receiver-progress-text').textContent = percentage + '%';
-}
-
-function updateReceiverOverallProgress(currentFileIndex, totalFiles) {
-    const overallProgressFill = document.getElementById('receiver-overall-progress-fill');
-    const overallProgressText = document.getElementById('receiver-overall-progress-text');
-    
-    if (overallProgressFill && overallProgressText) {
-        const completedFiles = currentFileIndex + 1;
-        const overallProgress = Math.round((completedFiles / totalFiles) * 100);
-        overallProgressFill.style.width = overallProgress + '%';
-        overallProgressText.textContent = `${completedFiles} of ${totalFiles} files`;
     }
 }
 
@@ -608,53 +563,85 @@ function formatFileSize(bytes) {
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function cancelTransfer() {
+    // Set flag to stop any ongoing transfers
+    transferCancelled = true;
+    
+    // Notify the other party before closing
+    if (currentConnection) {
+        try {
+            currentConnection.send({ type: 'transfer_cancelled' });
+        } catch (e) {
+            console.log('Could not send cancel message:', e);
+        }
+    }
+    
+    // Delay to allow message to send before redirecting
+    setTimeout(() => {
+        // Close the current connection
+        if (currentConnection) {
+            try {
+                currentConnection.close();
+            } catch (e) {}
+        }
+        
+        // Destroy the peer
+        if (peer) {
+            try {
+                peer.destroy();
+            } catch (e) {}
+        }
+        
+        // Redirect to home page (force refresh)
+        window.location.href = window.location.origin + window.location.pathname;
+    }, 500);
 }
 
 function resetToHome() {
-    peer = null;
+    // Clean up peer connection
+    if (currentConnection) {
+        currentConnection.close();
+        currentConnection = null;
+    }
+    if (peer) {
+        peer.destroy();
+        peer = null;
+    }
+    
     selectedFiles = [];
     currentFileIndex = 0;
-    currentConnection = null;
     isReceiver = false;
     globalTransferStartTime = null;
+    confirmedChunks = 0;
+    transferCancelled = false;
     
     document.getElementById('file-info').style.display = 'none';
-    document.getElementById('transfer-progress').style.display = 'none';
-    
     document.getElementById('file-input').value = '';
     
     showSenderSection();
     
     document.getElementById('drop-zone').classList.remove('dragover');
     
-    const statusElement = document.getElementById('connection-status');
-    if (statusElement) {
-        statusElement.innerHTML = '<p>Waiting for recipient to connect...</p>';
-    }
+    // Reset sender status
+    updateStatus('Waiting for recipient...');
     
-    const progressFill = document.getElementById('progress-fill');
-    if (progressFill) {
-        progressFill.style.width = '0%';
+    // Reset receiver status  
+    const receiverInfo = document.getElementById('receiver-info');
+    if (receiverInfo) {
+        receiverInfo.className = 'status-box';
     }
-    const progressText = document.getElementById('progress-text');
-    if (progressText) {
-        progressText.textContent = '0%';
+    const receiverMessage = document.getElementById('receiver-status-message');
+    if (receiverMessage) {
+        receiverMessage.style.display = 'flex';
+        receiverMessage.querySelector('span').textContent = 'Connecting to sender...';
     }
-    
-    const receiverProgressFill = document.getElementById('receiver-progress-fill');
-    if (receiverProgressFill) {
-        receiverProgressFill.style.width = '0%';
-    }
-    const receiverProgressText = document.getElementById('receiver-progress-text');
-    if (receiverProgressText) {
-        receiverProgressText.textContent = '0%';
-    }
-    
-    const receiverProgress = document.getElementById('receiver-progress');
-    if (receiverProgress) {
-        receiverProgress.style.display = 'none';
-    }
+    ['receiver-status-file', 'receiver-status-size', 'receiver-status-progress', 'receiver-status-speed', 'receiver-status-eta', 'receiver-status-overall'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = 'none';
+    });
     
     if (window.history && window.history.pushState) {
         const baseUrl = window.location.origin + window.location.pathname;
