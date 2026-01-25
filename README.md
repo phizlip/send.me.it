@@ -39,7 +39,7 @@ sequenceDiagram
 
 ## Security
 
-The server handles the handshake (Part 1) then steps aside. File transfers (Part 2) go directly between browsers. WebRTC [natively requires DTLS encryption](https://developer.mozilla.org/en-US/docs/Glossary/DTLS#:~:text=All%20of%20the%20WebRTC%20related%20protocols%20are%20required%20to%20encrypt%20their%20communications%20using%20DTLS%3B%20this%20includes%20SCTP%2C%20SRTP%2C%20and%20STUN%2E), so the server never sees your files.
+The server handles the handshake (Part 1) then steps aside. File transfers (Part 2) go directly between browsers. WebRTC [natively requires DTLS encryption](https://developer.mozilla.org/en-US/docs/Glossary/DTLS#:~:text=All%20of%20the%20WebRTC%20related%20protocols%20are%20required%20to%20encrypt%20their%20communications%20using%20DTLS%3B%20this%20includes%20SCTP%2C%20SRTP%2C%20and%20STUN%2E), so files are safe in transit.
 
 ## Development Setup
 
