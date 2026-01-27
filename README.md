@@ -66,7 +66,7 @@ docker compose up --build
 
 - Frontend: HTML + CSS + JavaScript
 - Backend: Node.js + Express + PeerJS
-- File transfer: See [How It Works](#how-it-works) above
+- File transfer: See [how it works](#how-it-works) above
 
 ## Ports
 
