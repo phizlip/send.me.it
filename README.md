@@ -64,14 +64,9 @@ docker compose up --build
 
 ## Architecture
 
-- Frontend: HTML + CSS + JavaScript
-- Backend: Node.js + Express + PeerJS
+- Frontend: HTML, CSS, JavaScript
+- Backend: Node.js, Express, PeerJS
 - File transfer: See [how it works](#how-it-works) above
-
-## Ports
-
-- 8080: Frontend
-- 9000: PeerJS signaling
 
 ## License
 
